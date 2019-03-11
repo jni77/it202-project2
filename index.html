@@ -207,16 +207,16 @@
 					db.markers.each(function(m) {
 						var location = {lat: parseFloat(m.latitude), lng: parseFloat(m.longitude) }
 						var label = m.status;
-						var image = "/markerimgs/open.png";
+						var image = "/it202-project2/markerimgs/open.png";
 						switch (label) {
 							case "Open":
-								image = "/markerimgs/open.png"; break;
+								image = "/it202-project2/markerimgs/open.png"; break;
 							case "Open - Dup":
-								image = "/markerimgs/open-dup.png"; break;
+								image = "/it202-project2/markerimgs/open-dup.png"; break;
 							case "Completed":
-								image = "/markerimgs/completed.png"; break;
+								image = "/it202-project2/markerimgs/completed.png"; break;
 							case "Completed - Dup":
-								image = "/markerimgs/completed-dup.png"; break;
+								image = "/it202-project2/markerimgs/completed-dup.png"; break;
 							default:
 						}
 						var marker = new google.maps.Marker({position: location, map: map, icon: image});
