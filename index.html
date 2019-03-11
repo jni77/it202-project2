@@ -166,7 +166,7 @@
 				
 				function loadList() {
 					$("#list").empty();
-					$("#location-list").append("<h2>Your query returned " + db.markers.count() + " records.</h2>");
+					//$("#location-list").append("<h2>Your query returned " + db.markers.count() + " records.</h2>");
 					db.markers.each(function(marker) {
 						var li = $("<li>");
 						li.append($("<h3>").text( marker.street_address));
