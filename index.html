@@ -1,0 +1,250 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel='manifest' href='./manifest.json'>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Graffiti Removal Requests</title>
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+	 crossorigin="anonymous">
+    <style>
+			.content {
+				display: none;
+			}
+       /* Set the size of the div element that contains the map */
+      #map {
+        height: 400px;  /* The height is 400 pixels */
+        max-width: 600px;
+        margin: 0 auto;
+        width: 100%;  /* The width is the width of the web page */
+       }
+    </style>
+  </head>
+  <body>
+		<nav class="navbar navbar-expand-lg navbar-light bg-light">
+			<a class="navbar-brand" href="#">Notes</a>
+			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+			</button>
+		<div class="collapse navbar-collapse" id="navbarNav">
+			<ul class="navbar-nav">
+				<li class="nav-item">
+					<a class="nav-link" href="#search-form">Search <span class="sr-only">(current)</span></a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="#location-list">List</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="#map-screen">Map</a>
+				</li>
+			</ul>
+		</div>
+		</nav>
+		<div class="content" id="search-form">
+			<h2>Search for grafitti removal requests:</h2>
+			<input type="text" id="ward" placeholder="Search by ward">
+			<!-- <input type="text" id="status" placeholder="Search by status"> -->
+			<select id="status">
+				<option value=""></option>
+				<option value="Open">Open</option>
+				<option value="Completed">Completed</option>
+				<option value="Open+-+Dup">Open - Dup</option>
+				<option value="Completed+-+Dup">Completed - Dup</option>
+			</select>
+ 		  <button id="search">Search</button>
+		</div>
+		<div class="content" id="location-list">
+			<ul id="list">
+    		<li>
+					<div></div>
+				</li>
+  		</ul>
+		</div>
+		<div class="content" id="map-screen">
+			<div id="map">
+			</div>
+		</div>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
+		<script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+		
+    <script>
+		// register the service worker for offline use
+		
+		if('serviceWorker' in navigator) {
+			navigator.serviceWorker
+			 .register('./sw.js')
+			 .then(function() { console.log("Service Worker Registered"); });
+		}
+		
+			
+		var endpoint = "https://data.cityofchicago.org/resource/cdmx-wzbz.json?$limit=";
+		var url = endpoint;
+		var markersArray = [];
+		var map;
+			
+		// Initialize and add the map
+		function initMap() {
+			// The location of Chicago
+			var chicago = {lat: 41.8781, lng: -87.6298};
+			// The map, centered at Chicago
+			map = new google.maps.Map (
+				document.getElementById('map'), {zoom: 11, center: chicago});
+		}
+	  
+    var db = new Dexie("marker_database");
+    db.version(1).stores({
+        markers: 'service_request_number, street_address, location, surface, creation_date, completion_date, latitude, longitude, status'
+    });
+		
+		// Deletes all markers in the array by removing references to them.
+		function deleteMarkers() {
+			for (var i = 0; i < markersArray.length; i++)
+				(markersArray[i]).setMap(null);
+			markersArray = [];
+		}
+			
+    $(document).ready(function () {
+        $("#search-form").show();
+        function hideScreens() {
+            $(".content").hide();
+        }
+			
+				// search button
+				// clears db and adds new markers to it
+      	$("#search").on("click", function() {
+					var searchWard = $("#ward").val();
+					var searchStatus = $("#status").val();
+					//check if fields were left blank
+					if (searchWard == "") {
+						if (searchStatus == "")
+							url = endpoint;
+						else
+							url = endpoint + "&status=" + searchStatus;
+					}
+					else {
+						if (searchStatus == "")
+							url = endpoint + "&ward=" + searchWard;
+						else
+							url = endpoint + "&ward=" + searchWard + "&status=" + searchStatus;
+					}
+					
+					$.get(url, function(response) {
+						db.markers.clear();
+						var data = response;
+						$.each(data, function(i,v){	
+							
+							var num = v.service_request_number;
+							var addr = v.street_address;
+							var location = v.where_is_the_graffiti_located_;
+							var surface = v.what_type_of_surface_is_the_graffiti_on_;
+							var creation = v.creation_date.substring(0, 10);
+							var completion = v.completion_date;
+							if (completion != null)
+								completion = completion.substring(0, 10);
+							else
+								completion = "";
+							
+					    //put results into database
+							db.markers.put({
+								service_request_number: num,
+								street_address: addr,
+								location: location,
+								surface: surface,
+								creation_date: creation,
+								completion_date: completion,
+								latitude: v.latitude,
+								longitude: v.longitude,
+								status: v.status
+							});
+										
+						});
+					});
+				});
+				
+				function loadList() {
+					$("#list").empty();
+					$("#location-list").append("<h2>Your query returned " + db.markers.count() + " records.</h2>");
+					db.markers.each(function(marker) {
+						var li = $("<li>");
+						li.append($("<h3>").text( marker.street_address));
+						li.append($("<h6>").text(marker.service_request_number));
+						li.append($("<p>").text("Graffiti is on a surface made of " + marker.surface.toLowerCase() + "."));
+						if (marker.location != null && marker.location != "")
+							li.append($("<p>").text("Graffiti is located on the " + marker.location.toLowerCase() + "."));
+						li.append($("<hr>"));
+						li.append($("<p>").text("Removal request created " + marker.creation_date + " and is currently " + marker.status.toLowerCase() + "."));
+						if (marker.completion_date != "")
+							li.append($("<p>").text("Removal request completed " + marker.completion_date + "."));							
+						$("#list").append(li);
+					});
+        }
+			
+				function loadMarkers () {
+					deleteMarkers();
+					
+					db.markers.each(function(m) {
+						var location = {lat: parseFloat(m.latitude), lng: parseFloat(m.longitude) }
+						var label = m.status;
+						var image = "/markerimgs/open.png";
+						switch (label) {
+							case "Open":
+								image = "/markerimgs/open.png"; break;
+							case "Open - Dup":
+								image = "/markerimgs/open-dup.png"; break;
+							case "Completed":
+								image = "/markerimgs/completed.png"; break;
+							case "Completed - Dup":
+								image = "/markerimgs/completed-dup.png"; break;
+							default:
+						}
+						var marker = new google.maps.Marker({position: location, map: map, icon: image});
+						
+						var contentString = "<h3>" + m.street_address + "</h3>" +
+																		"<h6>" + m.service_request_number + "</h6>" +
+																		"<p>Graffiti is on a surface made of " + m.surface + ".</p>";
+						if (m.location != "")
+							contentString += "<p>Graffiti is located on the " + m.location.toLowerCase() + ".</p>";
+						contentString += "<hr><p>Removal request created " + m.creation_date + " and is currently " + m.status.toLowerCase() + ".</p>";
+						if (m.creation_date != "")
+							contentString += "<p>Removal request completed " + m.completion_date + ".</p>";	
+						
+						var infowindow = new google.maps.InfoWindow({
+							content: contentString
+						});
+						
+						marker.addListener('click', function() {
+							infowindow.open(map, marker);
+						});
+
+						markersArray.push(marker);
+					});
+				}
+			
+        $(".nav-link").on("click", function () {
+					hideScreens();
+					var target = $(this).attr("href");
+					$(target).show();
+
+					if (target == "#location-list")
+						loadList();
+					else if (target == "#map-screen")
+						loadMarkers();
+        });
+    });
+
+
+
+    </script>
+    <!--Load the API from the specified URL
+    * The async attribute allows the browser to render the page while the API loads
+    * The key parameter will contain your own API key (which is not needed for this tutorial)
+    * The callback parameter executes the initMap() function
+    -->
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDa4dMSOASs_iLQnhrPoQ8EZgj2Im_pZ7o&callback=initMap">
+    </script>
+  </body>
+</html>
